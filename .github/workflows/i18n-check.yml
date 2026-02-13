@@ -54,36 +54,53 @@ jobs:
 
             // --- STRATEGY 1: General Issue Comment (Fail-safe) ---
 
-            // 1.1 Find and Delete Previous Comments (Table Reports)
+            // 1.1 Find Previous General Comment
+            const { data: existingComments } = await github.rest.issues.listComments({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo
+            });
+
+            const botCommentSignature = '### ⚠️ i18n Violations Report';
+            const previousComment = existingComments.find(c => 
+              c.body.includes(botCommentSignature)
+            );
+
+            // 1.2 Prepare New Comment Body
+            let summaryBody = `${botCommentSignature}\n\n`;
+            summaryBody += `Found **${report.length}** elements missing internationalization attributes.\n\n`;
+            summaryBody += '| File | Line | Issue | Suggested Fix |\n';
+            summaryBody += '| --- | --- | --- | --- |\n';
+
+            report.forEach(v => {
+               const relativeFile = v.file.replace(process.cwd() + '/', '');
+               summaryBody += `| \`${relativeFile}\` | ${v.line} | ${v.message} | \`${v.suggestion}\` |\n`;
+            });
+
+            summaryBody += '\n**Tip**: Use the suggested `i18n` IDs or generate your own meaningful IDs.';
+            summaryBody += `\n\n*Last updated: ${new Date().toISOString()}*`;
+
+            // 1.3 Update or Create
             try {
-              const { data: existingComments } = await github.rest.issues.listComments({
-                issue_number: context.issue.number,
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                per_page: 100 // Fetch more to ensure we find old ones
-              });
-
-              const botCommentSignature = '### ⚠️ i18n Violations Report';
-              const previousComments = existingComments.filter(c => 
-                c.body.includes(botCommentSignature)
-              );
-
-              console.log(`Found ${previousComments.length} previous general comments to delete.`);
-
-              for (const comment of previousComments) {
-                try {
-                  await github.rest.issues.deleteComment({
-                    owner: context.repo.owner,
-                    repo: context.repo.repo,
-                    comment_id: comment.id
-                  });
-                  console.log(`Deleted comment ID: ${comment.id}`);
-                } catch (err) {
-                  console.error(`Failed to delete comment ${comment.id}:`, err);
-                }
+              if (previousComment) {
+                await github.rest.issues.updateComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  comment_id: previousComment.id,
+                  body: summaryBody
+                });
+                console.log(`Successfully updated comment ID: ${previousComment.id}`);
+              } else {
+                await github.rest.issues.createComment({
+                  issue_number: context.issue.number,
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  body: summaryBody
+                });
+                console.log('Successfully created new General Issue Comment.');
               }
-            } catch (error) {
-              console.error('Error in cleaning up comments:', error);
+            } catch (err) {
+                console.error('Failed to post/update General Issue Comment:', err);
             }
 
             // 1.2 Find and Dismiss/Delete Previous Reviews (Inline Reports)
@@ -122,31 +139,6 @@ jobs:
               }
             } catch (error) {
               console.error('Error in cleaning up reviews:', error);
-            }
-
-            // 1.2 Post New Comment
-            let summaryBody = `${botCommentSignature}\n\n`;
-            summaryBody += `Found **${report.length}** elements missing internationalization attributes.\n\n`;
-            summaryBody += '| File | Line | Issue | Suggested Fix |\n';
-            summaryBody += '| --- | --- | --- | --- |\n';
-
-            report.forEach(v => {
-               const relativeFile = v.file.replace(process.cwd() + '/', '');
-               summaryBody += `| \`${relativeFile}\` | ${v.line} | ${v.message} | \`${v.suggestion}\` |\n`;
-            });
-
-            summaryBody += '\n**Tip**: Use the suggested `i18n` IDs or generate your own meaningful IDs.';
-
-            try {
-                await github.rest.issues.createComment({
-                    issue_number: context.issue.number,
-                    owner: context.repo.owner,
-                    repo: context.repo.repo,
-                    body: summaryBody
-                });
-                console.log('Successfully posted General Issue Comment.');
-            } catch (err) {
-                console.error('Failed to post General Issue Comment:', err);
             }
 
             // --- STRATEGY 2: Inline Code Review (Best Effort) ---
