@@ -3,11 +3,13 @@ import { LoginComponent } from './login/login.component';
 import { CreateEmployeeComponent } from './create-employee/create-employee.component';
 import { EmployeeDataComponent } from './employee-data/employee-data.component';
 import { SubmitComponent } from './submit/submit.component';
+import { HelpComponent } from './help/help.component'; // Added import for HelpComponent
 
 export const routes: Routes = [
   { path: '', redirectTo: 'login', pathMatch: 'full' },
   { path: 'login', component: LoginComponent },
   { path: 'create-employee', component: CreateEmployeeComponent },
   { path: 'employee-data', component: EmployeeDataComponent },
+  { path: 'help', loadComponent: () => import('./help/help.component').then(m => m.HelpComponent) },
   { path: 'submit', component: SubmitComponent },
 ];
