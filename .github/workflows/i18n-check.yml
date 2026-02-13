@@ -33,7 +33,7 @@ jobs:
         continue-on-error: true
 
       - name: Report Violations
-        if: steps.scanner.outcome == 'failure'
+        if: steps.scanner.outcome == 'failure' || steps.scanner.outcome == 'success'
         uses: actions/github-script@v7
         with:
           script: |
@@ -47,24 +47,66 @@ jobs:
 
             const report = JSON.parse(fs.readFileSync('i18n-report.json', 'utf8'));
 
-            if (report.length === 0) {
-              console.log('No violations found.');
-              return;
-            }
-
-            // --- STRATEGY 1: General Issue Comment (Fail-safe) ---
-
             // 1.1 Find Previous General Comment
             const { data: existingComments } = await github.rest.issues.listComments({
               issue_number: context.issue.number,
               owner: context.repo.owner,
-              repo: context.repo.repo
+              repo: context.repo.repo,
+              per_page: 100
             });
 
             const botCommentSignature = '### ⚠️ i18n Violations Report';
             const previousComment = existingComments.find(c => 
               c.body.includes(botCommentSignature)
             );
+
+            // CASE: Checks Passed (No violations)
+            if (report.length === 0) {
+              console.log('No violations found. Cleaning up...');
+              
+              // Delete General Comment if it exists
+              if (previousComment) {
+                try {
+                  await github.rest.issues.deleteComment({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    comment_id: previousComment.id
+                  });
+                  console.log(`Deleted previous general comment ID: ${previousComment.id}`);
+                } catch (err) {
+                  console.error(`Failed to delete comment:`, err);
+                }
+              }
+
+              // Dismiss any lingering reviews
+              try {
+                  const { data: reviews } = await github.rest.pulls.listReviews({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    pull_number: context.issue.number,
+                    per_page: 100
+                  });
+                  
+                  const botReviewSignature = '### 🛑 i18n Verification Failed (Inline)';
+                  const previousReviews = reviews.filter(r => 
+                    r.body.includes(botReviewSignature) && r.state !== 'DISMISSED'
+                  );
+
+                  for (const review of previousReviews) {
+                    await github.rest.pulls.dismissReview({
+                         owner: context.repo.owner,
+                         repo: context.repo.repo,
+                         pull_number: context.issue.number,
+                         review_id: review.id,
+                         message: 'All checks passed! 🎉'
+                    });
+                  }
+              } catch (e) { console.error('Error dismissing reviews:', e); }
+
+              return; 
+            }
+
+            // CASE: Violations Found (Proceed with Reporting)
 
             // 1.2 Prepare New Comment Body
             let summaryBody = `${botCommentSignature}\n\n`;
