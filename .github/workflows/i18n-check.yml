@@ -14,6 +14,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -36,6 +38,11 @@ jobs:
           script: |
             const fs = require('fs');
             const cp = require('child_process');
+
+            if (!fs.existsSync('i18n-report.json')) {
+              console.log('i18n-report.json not found. Scanner might have crashed or found no violations but exited 1.');
+              return;
+            }
 
             const report = JSON.parse(fs.readFileSync('i18n-report.json', 'utf8'));
 
