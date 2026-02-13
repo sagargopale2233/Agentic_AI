@@ -1,0 +1,62 @@
+name: i18n Check
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  scan-i18n:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run i18n Scanner
+        id: scanner
+        run: |
+          node tools/i18n-scanner/scan.js
+        continue-on-error: true
+
+      - name: Report Violations
+        if: steps.scanner.outcome == 'failure'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const report = JSON.parse(fs.readFileSync('i18n-report.json', 'utf8'));
+
+            let commentBody = '### ⚠️ i18n Violations Found\n\n';
+            commentBody += 'The following elements are missing internationalization attributes:\n\n';
+            commentBody += '| File | Line | Issue |\n';
+            commentBody += '| --- | --- | --- |\n';
+
+            report.forEach(violation => {
+              // file path relative to repo root
+              const file = violation.file.replace(process.cwd() + '/', ''); 
+              commentBody += `| \`${file}\` | ${violation.line} | ${violation.message} |\n`;
+            });
+
+            commentBody += '\nPlease add `i18n` attributes to these elements.';
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: commentBody
+            });
+
+      - name: Fail Workflow
+        if: steps.scanner.outcome == 'failure'
+        run: exit 1
