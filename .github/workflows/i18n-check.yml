@@ -35,7 +35,7 @@ jobs:
         with:
           script: |
             const fs = require('fs');
-            const { exec } = require('@actions/exec');
+            const cp = require('child_process');
 
             const report = JSON.parse(fs.readFileSync('i18n-report.json', 'utf8'));
 
@@ -45,9 +45,6 @@ jobs:
             }
 
             // --- STRATEGY 1: General Issue Comment (Fail-safe) ---
-            // We post a summary of ALL violations found in the PR, regardless of diff.
-            // This ensures the user definitely sees the report.
-            
             let summaryBody = '### ⚠️ i18n Violations Report\n\n';
             summaryBody += `Found **${report.length}** elements missing internationalization attributes.\n\n`;
             summaryBody += '| File | Line | Issue |\n';
@@ -72,16 +69,13 @@ jobs:
                 console.error('Failed to post General Issue Comment:', err);
             }
 
-
             // --- STRATEGY 2: Inline Code Review (Best Effort) ---
-            // We try to post comments directly on the changed lines. 
-            
             const comments = [];
             
             // Setup Base Ref
             const baseRef = context.payload.pull_request.base.ref;
             try {
-              await exec.exec('git', ['fetch', 'origin', baseRef]);
+              cp.execSync(`git fetch origin ${baseRef}`);
             } catch (e) {
               console.error(`Fetch failed (skipping inline comments): ${e}`);
             }
@@ -91,11 +85,8 @@ jobs:
               
               let diffOutput = '';
               try {
-                await exec.exec('git', ['diff', '-U0', `origin/${baseRef}`, '--', file], {
-                  listeners: { stdout: (data) => diffOutput += data.toString() },
-                  silent: true,
-                  ignoreReturnCode: true
-                });
+                // Run git diff using child_process
+                diffOutput = cp.execSync(`git diff -U0 origin/${baseRef} -- ${file}`).toString();
               } catch (e) { continue; }
 
               const changedLines = new Set();
