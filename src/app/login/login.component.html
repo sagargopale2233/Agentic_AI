@@ -4,21 +4,21 @@
       <h1 class="card-title text-center mb-4" i18n="@@loginTitle">Login Page</h1>
       <form>
         <div class="mb-3">
-          <label for="username" class="form-label">Username:</label> <!-- Missing i18n -->
+          <label for="username" class="form-label" i18n="@@labelUsername">Username:</label> <!-- Missing i18n -->
           <input type="text" class="form-control" id="username" name="username" placeholder="Enter username" i18n-placeholder="@@usernamePlaceholder">
-          <p class="text-info mt-1">Please enter your verified ID</p> <!-- NEW: Missing i18n -->
+          <p class="text-info mt-1" i18n="@@pPleaseenteryourverif">Please enter your verified ID</p> <!-- NEW: Missing i18n -->
         </div>
 
         <div class="mb-3">
           <label for="password" class="form-label" i18n="@@passwordLabel">Password:</label>
-          <input type="password" class="form-control" id="password" name="password" placeholder="Enter password"> <!-- Missing i18n-placeholder -->
+          <input type="password" class="form-control" id="password" name="password" placeholder="Enter password" i18n-placeholder="@@inputPlaceholderEnterpassword"> <!-- Missing i18n-placeholder -->
         </div>
 
         <div class="d-grid gap-2">
           <button type="button" class="btn btn-primary" (click)="onLogin()" i18n="@@loginButton">Login</button>
         </div>
         
-        <p class="mt-3 text-center">Forgot password? <a href="#">Reset here</a></p> <!-- Missing i18n -->
+        <p class="mt-3 text-center" i18n="@@pForgotpassword">Forgot password? <a href="#" i18n="@@aResethere">Reset here</a></p> <!-- Missing i18n -->
       </form>
     </div>
   </div>
