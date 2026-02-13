@@ -7,6 +7,7 @@ on:
 permissions:
   contents: read
   pull-requests: write
+  issues: write
 
 jobs:
   scan-i18n:
@@ -14,6 +15,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -35,27 +38,98 @@ jobs:
         with:
           script: |
             const fs = require('fs');
+            const cp = require('child_process');
+
+            if (!fs.existsSync('i18n-report.json')) {
+              console.log('i18n-report.json not found.');
+              return;
+            }
+
             const report = JSON.parse(fs.readFileSync('i18n-report.json', 'utf8'));
 
-            let commentBody = '### ⚠️ i18n Violations Found\n\n';
-            commentBody += 'The following elements are missing internationalization attributes:\n\n';
-            commentBody += '| File | Line | Issue |\n';
-            commentBody += '| --- | --- | --- |\n';
+            if (report.length === 0) {
+              console.log('No violations found.');
+              return;
+            }
 
-            report.forEach(violation => {
-              // file path relative to repo root
-              const file = violation.file.replace(process.cwd() + '/', ''); 
-              commentBody += `| \`${file}\` | ${violation.line} | ${violation.message} |\n`;
+            // --- STRATEGY 1: General Issue Comment (Fail-safe) ---
+            let summaryBody = '### ⚠️ i18n Violations Report\n\n';
+            summaryBody += `Found **${report.length}** elements missing internationalization attributes.\n\n`;
+            summaryBody += '| File | Line | Issue |\n';
+            summaryBody += '| --- | --- | --- |\n';
+
+            report.forEach(v => {
+               const relativeFile = v.file.replace(process.cwd() + '/', '');
+               summaryBody += `| \`${relativeFile}\` | ${v.line} | ${v.message} |\n`;
             });
 
-            commentBody += '\nPlease add `i18n` attributes to these elements.';
+            summaryBody += '\nPlease add `i18n` attributes to these elements.';
 
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: commentBody
-            });
+            try {
+                await github.rest.issues.createComment({
+                    issue_number: context.issue.number,
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    body: summaryBody
+                });
+                console.log('Successfully posted General Issue Comment.');
+            } catch (err) {
+                console.error('Failed to post General Issue Comment:', err);
+            }
+
+            // --- STRATEGY 2: Inline Code Review (Best Effort) ---
+            const comments = [];
+            const baseRef = context.payload.pull_request.base.ref;
+
+            try {
+              cp.execSync(`git fetch origin ${baseRef}`);
+            } catch (e) {
+              console.error(`Fetch failed: ${e}`);
+            }
+
+            for (const violation of report) {
+              const file = violation.file.replace(process.cwd() + '/', '');
+              
+              let diffOutput = '';
+              try {
+                diffOutput = cp.execSync(`git diff -U0 origin/${baseRef} -- ${file}`).toString();
+              } catch (e) { continue; }
+
+              const changedLines = new Set();
+              diffOutput.split('\n').forEach(line => {
+                 if (line.startsWith('@@')) {
+                     const match = line.match(/\+([0-9]+),?([0-9]*)/);
+                     if (match) {
+                         const start = parseInt(match[1]);
+                         const len = match[2] ? parseInt(match[2]) : 1;
+                         for (let i = 0; i < len; i++) changedLines.add(start + i);
+                     }
+                 }
+              });
+
+              if (changedLines.has(violation.line)) {
+                 comments.push({
+                   path: file,
+                   line: violation.line,
+                   body: `⚠️ **i18n Missing**: ${violation.message}`
+                 });
+              }
+            }
+
+            if (comments.length > 0) {
+                try {
+                  await github.rest.pulls.createReview({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    pull_number: context.issue.number,
+                    event: 'REQUEST_CHANGES',
+                    body: '### 🛑 i18n Verification Failed (Inline)',
+                    comments: comments
+                  });
+                } catch (error) {
+                  console.error('Failed to post inline review comments:', error);
+                }
+            }
 
       - name: Fail Workflow
         if: steps.scanner.outcome == 'failure'

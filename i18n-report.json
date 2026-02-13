@@ -1,0 +1,102 @@
+[
+  {
+    "file": "src/app/app.component.html",
+    "line": 3,
+    "message": "Element <a> with text \"Agentic AI...\" is missing 'i18n' attribute."
+  },
+  {
+    "file": "src/app/app.component.html",
+    "line": 10,
+    "message": "Element <a> with text \"Login...\" is missing 'i18n' attribute."
+  },
+  {
+    "file": "src/app/app.component.html",
+    "line": 13,
+    "message": "Element <a> with text \"Create Employee...\" is missing 'i18n' attribute."
+  },
+  {
+    "file": "src/app/app.component.html",
+    "line": 16,
+    "message": "Element <a> with text \"Employee Data...\" is missing 'i18n' attribute."
+  },
+  {
+    "file": "src/app/submit/submit.component.html",
+    "line": 3,
+    "message": "Element <h4> with text \"Submission Successfu...\" is missing 'i18n' attribute."
+  },
+  {
+    "file": "src/app/login/login.component.html",
+    "line": 20,
+    "message": "Element <p> with text \"Forgot password?...\" is missing 'i18n' attribute."
+  },
+  {
+    "file": "src/app/login/login.component.html",
+    "line": 7,
+    "message": "Element <label> with text \"Username:...\" is missing 'i18n' attribute."
+  },
+  {
+    "file": "src/app/login/login.component.html",
+    "line": 20,
+    "message": "Element <a> with text \"Reset here...\" is missing 'i18n' attribute."
+  },
+  {
+    "file": "src/app/login/login.component.html",
+    "line": 13,
+    "message": "Element <input> with attribute 'placeholder=\"Enter password...\"' is missing 'i18n-placeholder' attribute."
+  },
+  {
+    "file": "src/app/employee-data/employee-data.component.html",
+    "line": 4,
+    "message": "Element <button> with text \"Add Employee...\" is missing 'i18n' attribute."
+  },
+  {
+    "file": "src/app/employee-data/employee-data.component.html",
+    "line": 5,
+    "message": "Element <button> with text \"Export Data...\" is missing 'i18n' attribute."
+  },
+  {
+    "file": "src/app/employee-data/employee-data.component.html",
+    "line": 14,
+    "message": "Element <th> with text \"Name...\" is missing 'i18n' attribute."
+  },
+  {
+    "file": "src/app/employee-data/employee-data.component.html",
+    "line": 16,
+    "message": "Element <th> with text \"Department...\" is missing 'i18n' attribute."
+  },
+  {
+    "file": "src/app/create-employee/create-employee.component.html",
+    "line": 7,
+    "message": "Element <label> with text \"Employee Name:...\" is missing 'i18n' attribute."
+  },
+  {
+    "file": "src/app/create-employee/create-employee.component.html",
+    "line": 17,
+    "message": "Element <label> with text \"Department:...\" is missing 'i18n' attribute."
+  },
+  {
+    "file": "src/app/create-employee/create-employee.component.html",
+    "line": 19,
+    "message": "Element <option> with text \"Select Department...\" is missing 'i18n' attribute."
+  },
+  {
+    "file": "src/app/create-employee/create-employee.component.html",
+    "line": 20,
+    "message": "Element <option> with text \"Engineering...\" is missing 'i18n' attribute."
+  },
+  {
+    "file": "src/app/create-employee/create-employee.component.html",
+    "line": 21,
+    "message": "Element <option> with text \"HR...\" is missing 'i18n' attribute."
+  },
+  {
+    "file": "src/app/create-employee/create-employee.component.html",
+    "line": 22,
+    "message": "Element <option> with text \"Sales...\" is missing 'i18n' attribute."
+  },
+  {
+    "file": "src/app/create-employee/create-employee.component.html",
+    "line": 13,
+    "message": "Element <input> with attribute 'placeholder=\"e.g. Developer...\"' is missing 'i18n-placeholder' attribute."
+  }
+]

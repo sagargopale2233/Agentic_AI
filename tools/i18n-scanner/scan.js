@@ -32,12 +32,7 @@ function scanFile(filePath) {
                 .join('');
             
             if (textContent.length > 0 && !el.hasAttribute('i18n')) {
-                // Ignore purely interpolated text (e.g. {{ var }}) if that's the policy, 
-                // but usually even that might need i18n. For now, let's flag if it has any text.
-                // Refinement: If it starts with {{ and ends with }}, maybe skip? 
-                // Let's be strict: if it has meaningful text and no i18n, flag it.
-                
-                // Simple check: does it look like purely {{ ... }}?
+                // Ignore purely interpolated text (e.g. {{ var }})
                 if (!/^\{\{.*\}\}$/.test(textContent)) {
                    violations.push({
                         file: filePath,
@@ -56,7 +51,6 @@ function scanFile(filePath) {
             if (el.hasAttribute(attr)) {
                 const attrVal = el.getAttribute(attr);
                 if (attrVal && attrVal.trim().length > 0 && !el.hasAttribute(`i18n-${attr}`)) {
-                     // Start simple: if it has placeholder="foo", it needs i18n-placeholder
                      if (!/^\{\{.*\}\}$/.test(attrVal)) {
                         violations.push({
                             file: filePath,
@@ -86,12 +80,16 @@ async function main() {
         if (allViolations.length > 0) {
             console.log('i18n Violations Found:');
             console.log(JSON.stringify(allViolations, null, 2));
-            
-            // Output to a file for GitHub Action to read
             fs.writeFileSync('i18n-report.json', JSON.stringify(allViolations, null, 2));
-            process.exit(1); // Fail the build
+            // We exit 0 here so the workflow continues to the Report step.
+            // The Report step will decide whether to fail the build based on contents.
+            // Actually, let's exit 1 so we can use `continue-on-error` in workflow, 
+            // but for simplicity, let's exit 0 and let the script handle it.
+            // Wait, previous logic relied on exit 1. Let's stick to exit 1.
+            process.exit(1); 
         } else {
             console.log('No i18n violations found.');
+            fs.writeFileSync('i18n-report.json', '[]'); // Write empty array
             process.exit(0);
         }
     } catch (err) {
