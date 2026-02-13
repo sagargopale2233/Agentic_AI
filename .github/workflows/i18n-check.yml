@@ -53,7 +53,34 @@ jobs:
             }
 
             // --- STRATEGY 1: General Issue Comment (Fail-safe) ---
-            let summaryBody = '### ⚠️ i18n Violations Report\n\n';
+
+            // 1.1 Find and Delete Previous Comments
+            const { data: existingComments } = await github.rest.issues.listComments({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo
+            });
+
+            const botCommentSignature = '### ⚠️ i18n Violations Report';
+            const previousComments = existingComments.filter(c => 
+              c.user.type === 'Bot' && c.body.includes(botCommentSignature)
+            );
+
+            for (const comment of previousComments) {
+              try {
+                await github.rest.issues.deleteComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  comment_id: comment.id
+                });
+                console.log(`Deleted previous comment ID: ${comment.id}`);
+              } catch (err) {
+                console.error(`Failed to delete comment ${comment.id}:`, err);
+              }
+            }
+
+            // 1.2 Post New Comment
+            let summaryBody = `${botCommentSignature}\n\n`;
             summaryBody += `Found **${report.length}** elements missing internationalization attributes.\n\n`;
             summaryBody += '| File | Line | Issue |\n';
             summaryBody += '| --- | --- | --- |\n';
