@@ -145,6 +145,20 @@ jobs:
             const comments = [];
             const baseRef = context.payload.pull_request.base.ref;
 
+            // 2.1 Fetch Existing File Comments to avoid duplicates
+            // We want to avoid commenting on the exact same line with the exact same message if it's already there.
+            const { data: existingReviewComments } = await github.rest.pulls.listReviewComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number,
+              per_page: 100
+            });
+
+            const existingCommentsMap = new Set(
+              existingReviewComments.map(c => `${c.path}:${c.line}:${c.body.trim()}`)
+            );
+
+            // 2.2 Prepare GIT
             try {
               cp.execSync(`git fetch origin ${baseRef}`);
             } catch (e) {
@@ -172,11 +186,17 @@ jobs:
               });
 
               if (changedLines.has(violation.line)) {
-                 comments.push({
-                   path: file,
-                   line: violation.line,
-                   body: `⚠️ **i18n Missing**: ${violation.message}\n\n**Suggested Fix**:\n\`\`\`html\n${violation.suggestion}\n\`\`\``
-                 });
+                 const body = `⚠️ **i18n Missing**: ${violation.message}\n\n**Suggested Fix**:\n\`\`\`html\n${violation.suggestion}\n\`\`\``;
+                 const key = `${file}:${violation.line}:${body.trim()}`;
+                 
+                 // Only add if not already commented
+                 if (!existingCommentsMap.has(key)) {
+                    comments.push({
+                      path: file,
+                      line: violation.line,
+                      body: body
+                    });
+                 }
               }
             }
 
