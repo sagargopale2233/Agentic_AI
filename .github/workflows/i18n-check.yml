@@ -36,27 +36,53 @@ jobs:
         with:
           script: |
             const fs = require('fs');
-            const report = JSON.parse(fs.readFileSync('i18n-report.json', 'utf8'));
 
-            let commentBody = '### ⚠️ i18n Violations Found\n\n';
-            commentBody += 'The following elements are missing internationalization attributes:\n\n';
-            commentBody += '| File | Line | Issue |\n';
-            commentBody += '| --- | --- | --- |\n';
-
-            report.forEach(violation => {
-              // file path relative to repo root
-              const file = violation.file.replace(process.cwd() + '/', ''); 
-              commentBody += `| \`${file}\` | ${violation.line} | ${violation.message} |\n`;
-            });
-
-            commentBody += '\nPlease add `i18n` attributes to these elements.';
-
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
+            // 1. Get List of Changed Files in PR
+            const changedFiles = await github.paginate(github.rest.pulls.listFiles, {
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: commentBody
+              pull_number: context.issue.number,
             });
+            const changedFileNames = new Set(changedFiles.map(f => f.filename));
+
+            // 2. Read Report
+            const report = JSON.parse(fs.readFileSync('i18n-report.json', 'utf8'));
+            const comments = [];
+
+            // 3. Build Review Comments
+            report.forEach(violation => {
+              const file = violation.file.replace(process.cwd() + '/', ''); 
+              
+              // Only comment on files that successfully changed in this PR
+              if (changedFileNames.has(file)) {
+                 comments.push({
+                   path: file,
+                   line: violation.line,
+                   body: `⚠️ **i18n Missing**: ${violation.message}`
+                 });
+              }
+            });
+
+            // 4. Submit Review
+            if (comments.length > 0) {
+                try {
+                  await github.rest.pulls.createReview({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    pull_number: context.issue.number,
+                    event: 'REQUEST_CHANGES',
+                    body: '### 🛑 i18n Verification Failed\n\nPlease address the missing internationalization attributes highlighted below.',
+                    comments: comments
+                  });
+                } catch (error) {
+                  console.error('Error creating review:', error);
+                  // Context: API fails if a comment points to a line NOT in the diff.
+                  // For this demo, it should work as the violation is on a new line.
+                  core.setFailed('Failed to post review comments. Check logs.');
+                }
+            } else {
+                console.log('Violations found, but none in the changed files (or files not matched).');
+            }
 
       - name: Fail Workflow
         if: steps.scanner.outcome == 'failure'
