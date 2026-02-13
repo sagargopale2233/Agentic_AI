@@ -35,28 +35,113 @@ jobs:
         with:
           script: |
             const fs = require('fs');
+            const { exec } = require('@actions/exec');
+
+            console.log('Debug: Starting Report Violations script.');
+
             const report = JSON.parse(fs.readFileSync('i18n-report.json', 'utf8'));
+            console.log(`Debug: Found ${report.length} violations in i18n-report.json.`);
 
-            let commentBody = '### ⚠️ i18n Violations Found\n\n';
-            commentBody += 'The following elements are missing internationalization attributes:\n\n';
-            commentBody += '| File | Line | Issue |\n';
-            commentBody += '| --- | --- | --- |\n';
+            if (report.length === 0) {
+              console.log('Debug: No violations found, exiting script.');
+              return;
+            }
 
-            report.forEach(violation => {
-              // file path relative to repo root
-              const file = violation.file.replace(process.cwd() + '/', ''); 
-              commentBody += `| \`${file}\` | ${violation.line} | ${violation.message} |\n`;
-            });
+            // 1. Initialize comments array
+            const comments = [];
 
-            commentBody += '\nPlease add `i18n` attributes to these elements.';
+            // 2. Setup Base Ref
+            const baseRef = context.payload.pull_request.base.ref;
+            console.log(`Debug: Base Ref: ${baseRef}`);
+            
+            try {
+              await exec.exec('git', ['fetch', 'origin', baseRef]);
+              console.log(`Debug: Successfully fetched origin/${baseRef}.`);
+            } catch (e) {
+              console.error(`Debug: Fetch failed: ${e}`);
+            }
 
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: commentBody
-            });
+            // 3. Process each violation
+            for (const violation of report) {
+              const file = violation.file.replace(process.cwd() + '/', '');
+              console.log(`Debug: Processing violation in ${file} at line ${violation.line}`);
+
+              // Get diff for this file
+              let diffOutput = '';
+              try {
+                // diff -U0 means zero context lines, to only see changed lines
+                await exec.exec('git', ['diff', '-U0', `origin/${baseRef}`, '--', file], {
+                  listeners: { stdout: (data) => diffOutput += data.toString() },
+                  silent: true,
+                  ignoreReturnCode: true
+                });
+                console.log(`Debug: Git diff command executed for ${file}.`);
+              } catch (e) { console.error('Git diff failed', e); continue; }
+
+              console.log(`Debug: Diff output for ${file}: \n${diffOutput}`);
+
+              // Parse changed lines from diff
+              const changedLines = new Set();
+              diffOutput.split('\n').forEach(line => {
+                 if (line.startsWith('@@')) {
+                     // Parse @@ -old,len +new,len @@
+                     // We care about +new,len. The regex matches +start,len or +start
+                     const match = line.match(/\+([0-9]+),?([0-9]*)/);
+                     if (match) {
+                         const start = parseInt(match[1]);
+                         const len = match[2] ? parseInt(match[2]) : 1;
+                         console.log(`Debug: Found changed chunk starting at ${start} with length ${len}`);
+                         for (let i = 0; i < len; i++) changedLines.add(start + i);
+                     }
+                 }
+              });
+
+              // Add comment IF line is changed
+              if (changedLines.has(violation.line)) {
+                 console.log(`Debug: Violation at line ${violation.line} is in changed lines! Adding comment.`);
+                 comments.push({
+                   path: file,
+                   line: violation.line,
+                   body: `⚠️ **i18n Missing**: ${violation.message}`
+                 });
+              } else {
+                 console.log(`Debug: Violation at line ${violation.line} is NOT in changed lines.`);
+              }
+            }
+
+            console.log(`Debug: Total comments to post: ${comments.length}`);
+
+            // 4. Post comments
+            if (comments.length > 0) {
+              let commentBody = '### ⚠️ i18n Violations Found in Changed Lines\n\n';
+              commentBody += 'The following elements in the changed lines are missing internationalization attributes:\n\n';
+              commentBody += '| File | Line | Issue |\n';
+              commentBody += '| --- | --- | --- |\n';
+
+              comments.forEach(comment => {
+                commentBody += `| \`${comment.path}\` | ${comment.line} | ${comment.body.replace('⚠️ **i18n Missing**: ', '')} |\n`;
+              });
+
+              commentBody += '\nPlease add `i18n` attributes to these elements.';
+
+              github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: commentBody
+              });
+              console.log('Debug: Posted a summary comment for violations in changed lines.');
+            } else {
+              console.log('Debug: No violations found in changed lines, no summary comment posted.');
+            }
+            
+            // If there are any violations (even if not in changed lines), we might still want to fail the workflow.
+            // The original logic was to fail if scanner.outcome was 'failure'.
+            // This script only reports on changed lines, but the workflow failure condition is separate.
+            console.log('Debug: Report Violations script finished.');
+```
 
       - name: Fail Workflow
         if: steps.scanner.outcome == 'failure'
         run: exit 1
+```
