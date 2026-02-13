@@ -1,0 +1,30 @@
+<div class="d-flex justify-content-center mt-5">
+  <div class="card shadow p-4" style="width: 32rem;">
+    <div class="card-body">
+      <h2 class="card-title mb-4" i18n="@@createEmployeeTitle">Create New Employee</h2>
+      <form (ngSubmit)="onSubmit()">
+        <div class="mb-3">
+          <label for="name" class="form-label">Employee Name:</label> <!-- Missing i18n -->
+          <input type="text" class="form-control" id="name" name="name" [(ngModel)]="employee.name" placeholder="Enter full name" i18n-placeholder="@@namePlaceholder">
+        </div>
+
+        <div class="mb-3">
+          <label for="role" class="form-label" i18n="@@roleLabel">Job Role:</label>
+          <input type="text" class="form-control" id="role" name="role" [(ngModel)]="employee.role" placeholder="e.g. Developer"> <!-- Missing i18n-placeholder -->
+        </div>
+
+        <div class="mb-3">
+          <label for="department" class="form-label">Department:</label> <!-- Missing i18n -->
+          <select class="form-select" id="department" name="department" [(ngModel)]="employee.department">
+            <option value="" disabled selected>Select Department</option> <!-- Missing i18n -->
+            <option value="Engineering">Engineering</option>
+            <option value="HR">HR</option>
+            <option value="Sales">Sales</option>
+          </select>
+        </div>
+
+        <button type="submit" class="btn btn-success" i18n="@@submitButton">Save Record</button>
+      </form>
+    </div>
+  </div>
+</div>
