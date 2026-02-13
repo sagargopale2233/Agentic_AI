@@ -54,29 +54,74 @@ jobs:
 
             // --- STRATEGY 1: General Issue Comment (Fail-safe) ---
 
-            // 1.1 Find and Delete Previous Comments
-            const { data: existingComments } = await github.rest.issues.listComments({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo
-            });
+            // 1.1 Find and Delete Previous Comments (Table Reports)
+            try {
+              const { data: existingComments } = await github.rest.issues.listComments({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                per_page: 100 // Fetch more to ensure we find old ones
+              });
 
-            const botCommentSignature = '### ⚠️ i18n Violations Report';
-            const previousComments = existingComments.filter(c => 
-              c.user.type === 'Bot' && c.body.includes(botCommentSignature)
-            );
+              const botCommentSignature = '### ⚠️ i18n Violations Report';
+              const previousComments = existingComments.filter(c => 
+                c.body.includes(botCommentSignature)
+              );
 
-            for (const comment of previousComments) {
-              try {
-                await github.rest.issues.deleteComment({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  comment_id: comment.id
-                });
-                console.log(`Deleted previous comment ID: ${comment.id}`);
-              } catch (err) {
-                console.error(`Failed to delete comment ${comment.id}:`, err);
+              console.log(`Found ${previousComments.length} previous general comments to delete.`);
+
+              for (const comment of previousComments) {
+                try {
+                  await github.rest.issues.deleteComment({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    comment_id: comment.id
+                  });
+                  console.log(`Deleted comment ID: ${comment.id}`);
+                } catch (err) {
+                  console.error(`Failed to delete comment ${comment.id}:`, err);
+                }
               }
+            } catch (error) {
+              console.error('Error in cleaning up comments:', error);
+            }
+
+            // 1.2 Find and Dismiss/Delete Previous Reviews (Inline Reports)
+            try {
+              const { data: reviews } = await github.rest.pulls.listReviews({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: context.issue.number,
+                per_page: 100
+              });
+
+              const botReviewSignature = '### 🛑 i18n Verification Failed (Inline)';
+              const previousReviews = reviews.filter(r => 
+                r.body.includes(botReviewSignature) && r.state !== 'DISMISSED'
+              );
+              
+              console.log(`Found ${previousReviews.length} previous reviews to dismiss.`);
+
+              for (const review of previousReviews) {
+                try {
+                   // Try to dismiss the review to collapse it
+                   await github.rest.pulls.dismissReview({
+                     owner: context.repo.owner,
+                     repo: context.repo.repo,
+                     pull_number: context.issue.number,
+                     review_id: review.id,
+                     message: 'Outdated i18n report (New scan running)'
+                   });
+                   console.log(`Dismissed review ID: ${review.id}`);
+                   
+                   // Option: Delete if possible (DELETE method often requires admin/special scope)
+                   // await github.request('DELETE /repos/{owner}/{repo}/pulls/{pull_number}/reviews/{review_id}', { ... })
+                } catch (err) {
+                   console.error(`Failed to dismiss review ${review.id}:`, err);
+                }
+              }
+            } catch (error) {
+              console.error('Error in cleaning up reviews:', error);
             }
 
             // 1.2 Post New Comment
