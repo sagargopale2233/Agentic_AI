@@ -7,6 +7,7 @@ on:
 permissions:
   contents: read
   pull-requests: write
+  issues: write
 
 jobs:
   scan-i18n:
@@ -14,6 +15,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -35,27 +38,70 @@ jobs:
         with:
           script: |
             const fs = require('fs');
+            const exec = require('@actions/exec');
+
+            // 1. Read Report
             const report = JSON.parse(fs.readFileSync('i18n-report.json', 'utf8'));
+            const comments = [];
 
-            let commentBody = '### ⚠️ i18n Violations Found\n\n';
-            commentBody += 'The following elements are missing internationalization attributes:\n\n';
-            commentBody += '| File | Line | Issue |\n';
-            commentBody += '| --- | --- | --- |\n';
+            // 2. Setup Base Ref
+            // For pull_request events, base.ref is available
+            const baseRef = context.payload.pull_request.base.ref;
+            await exec.exec('git', ['fetch', 'origin', baseRef]);
 
-            report.forEach(violation => {
-              // file path relative to repo root
-              const file = violation.file.replace(process.cwd() + '/', ''); 
-              commentBody += `| \`${file}\` | ${violation.line} | ${violation.message} |\n`;
-            });
+            // 3. Process each violation
+            for (const violation of report) {
+              const file = violation.file.replace(process.cwd() + '/', '');
+              
+              // Get diff for this file
+              let diffOutput = '';
+              try {
+                // diff -U0 means zero context lines, to only see changed lines
+                await exec.exec('git', ['diff', '-U0', `origin/${baseRef}`, '--', file], {
+                  listeners: { stdout: (data) => diffOutput += data.toString() },
+                  silent: true,
+                  ignoreReturnCode: true
+                });
+              } catch (e) { console.error('Git diff failed', e); continue; }
 
-            commentBody += '\nPlease add `i18n` attributes to these elements.';
+              // Parse changed lines from diff
+              const changedLines = new Set();
+              diffOutput.split('\n').forEach(line => {
+                 if (line.startsWith('@@')) {
+                     // Parse @@ -old,len +new,len @@
+                     // We care about +new,len. The regex matches +start,len or +start
+                     const match = line.match(/\+([0-9]+),?([0-9]*)/);
+                     if (match) {
+                         const start = parseInt(match[1]);
+                         const len = match[2] ? parseInt(match[2]) : 1;
+                         for (let i = 0; i < len; i++) changedLines.add(start + i);
+                     }
+                 }
+              });
 
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: commentBody
-            });
+              // Add comment IF line is changed
+              if (changedLines.has(violation.line)) {
+                 comments.push({
+                   path: file,
+                   line: violation.line,
+                   body: `⚠️ **i18n Missing**: ${violation.message}`
+                 });
+              }
+            }
+
+            // 4. Submit Review
+            if (comments.length > 0) {
+                await github.rest.pulls.createReview({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  pull_number: context.issue.number,
+                  event: 'REQUEST_CHANGES',
+                  body: '### 🛑 i18n Verification Failed\n\nPlease address the missing internationalization attributes highlighted below.',
+                  comments: comments
+                });
+            } else {
+                console.log('Violations found, but none on changed lines.');
+            }
 
       - name: Fail Workflow
         if: steps.scanner.outcome == 'failure'
