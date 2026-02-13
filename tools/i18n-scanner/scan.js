@@ -21,23 +21,27 @@ function scanFile(filePath) {
         return content.substring(0, index).split('\n').length;
     }
 
+    function generateId(text) {
+        return text.replace(/[^a-zA-Z0-9]/g, '').substring(0, 20); // Simple ID generation
+    }
+
     // Check Text Content
     TEXT_ELEMENTS.forEach(tag => {
         const elements = root.querySelectorAll(tag);
         elements.forEach(el => {
-            // Check for direct text content
             const textContent = el.childNodes
-                .filter(node => node.nodeType === 3) // Text node
+                .filter(node => node.nodeType === 3)
                 .map(node => node.text.trim())
                 .join('');
             
             if (textContent.length > 0 && !el.hasAttribute('i18n')) {
-                // Ignore purely interpolated text (e.g. {{ var }})
                 if (!/^\{\{.*\}\}$/.test(textContent)) {
+                   const id = `@@${tag}${generateId(textContent)}`;
                    violations.push({
                         file: filePath,
                         line: getLineNumber(el.range[0]),
-                        message: `Element <${tag}> with text "${textContent.substring(0, 20)}..." is missing 'i18n' attribute.`
+                        message: `Element <${tag}> is missing 'i18n' attribute.`,
+                        suggestion: `Add i18n="${id}"`
                    });
                 }
             }
@@ -52,10 +56,12 @@ function scanFile(filePath) {
                 const attrVal = el.getAttribute(attr);
                 if (attrVal && attrVal.trim().length > 0 && !el.hasAttribute(`i18n-${attr}`)) {
                      if (!/^\{\{.*\}\}$/.test(attrVal)) {
+                        const id = `@@${el.tagName.toLowerCase()}${attr.charAt(0).toUpperCase() + attr.slice(1)}${generateId(attrVal)}`;
                         violations.push({
                             file: filePath,
                             line: getLineNumber(el.range[0]),
-                            message: `Element <${el.tagName.toLowerCase()}> with attribute '${attr}="${attrVal.substring(0, 20)}..."' is missing 'i18n-${attr}' attribute.`
+                            message: `Element <${el.tagName.toLowerCase()}> is missing 'i18n-${attr}'.`,
+                            suggestion: `Add i18n-${attr}="${id}"`
                         });
                      }
                 }

@@ -82,15 +82,15 @@ jobs:
             // 1.2 Post New Comment
             let summaryBody = `${botCommentSignature}\n\n`;
             summaryBody += `Found **${report.length}** elements missing internationalization attributes.\n\n`;
-            summaryBody += '| File | Line | Issue |\n';
-            summaryBody += '| --- | --- | --- |\n';
+            summaryBody += '| File | Line | Issue | Suggested Fix |\n';
+            summaryBody += '| --- | --- | --- | --- |\n';
 
             report.forEach(v => {
                const relativeFile = v.file.replace(process.cwd() + '/', '');
-               summaryBody += `| \`${relativeFile}\` | ${v.line} | ${v.message} |\n`;
+               summaryBody += `| \`${relativeFile}\` | ${v.line} | ${v.message} | \`${v.suggestion}\` |\n`;
             });
 
-            summaryBody += '\nPlease add `i18n` attributes to these elements.';
+            summaryBody += '\n**Tip**: Use the suggested `i18n` IDs or generate your own meaningful IDs.';
 
             try {
                 await github.rest.issues.createComment({
@@ -138,7 +138,7 @@ jobs:
                  comments.push({
                    path: file,
                    line: violation.line,
-                   body: `⚠️ **i18n Missing**: ${violation.message}`
+                   body: `⚠️ **i18n Missing**: ${violation.message}\n\n**Suggested Fix**:\n\`\`\`html\n${violation.suggestion}\n\`\`\``
                  });
               }
             }
