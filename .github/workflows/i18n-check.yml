@@ -78,7 +78,35 @@ jobs:
                 }
               }
 
-              // Dismiss any lingering reviews
+              // 1.2 Delete Inline Review Comments
+              try {
+                const { data: reviewComments } = await github.rest.pulls.listReviewComments({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  pull_number: context.issue.number,
+                  per_page: 100
+                });
+
+                const botReviewComments = reviewComments.filter(c => 
+                  c.body.includes('⚠️ **i18n Missing**')
+                );
+                
+                console.log(`Found ${botReviewComments.length} inline comments to delete.`);
+
+                for (const comment of botReviewComments) {
+                    try {
+                      await github.rest.pulls.deleteReviewComment({
+                        owner: context.repo.owner,
+                        repo: context.repo.repo,
+                        comment_id: comment.id
+                      });
+                    } catch (e) {
+                      console.error(`Failed to delete review comment ${comment.id}:`, e);
+                    }
+                }
+              } catch (e) { console.error('Error deleting review comments:', e); }
+
+              // 1.3 Dismiss any lingering reviews (Containers)
               try {
                   const { data: reviews } = await github.rest.pulls.listReviews({
                     owner: context.repo.owner,
