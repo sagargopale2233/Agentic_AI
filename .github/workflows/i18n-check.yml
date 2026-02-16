@@ -121,15 +121,27 @@ jobs:
                   );
 
                   for (const review of previousReviews) {
-                    await github.rest.pulls.dismissReview({
-                         owner: context.repo.owner,
-                         repo: context.repo.repo,
-                         pull_number: context.issue.number,
-                         review_id: review.id,
-                         message: 'All checks passed! 🎉'
-                    });
+                    try {
+                      // 1.3.1 Update the Review Title/Body to be positive
+                      await github.rest.pulls.updateReview({
+                        owner: context.repo.owner,
+                        repo: context.repo.repo,
+                        pull_number: context.issue.number,
+                        review_id: review.id,
+                        body: '### ✅ i18n Issues Resolved'
+                      });
+
+                      // 1.3.2 Dismiss it
+                      await github.rest.pulls.dismissReview({
+                           owner: context.repo.owner,
+                           repo: context.repo.repo,
+                           pull_number: context.issue.number,
+                           review_id: review.id,
+                           message: 'All checks passed! 🎉'
+                      });
+                    } catch (e) { console.error(`Failed to update/dismiss review ${review.id}:`, e); }
                   }
-              } catch (e) { console.error('Error dismissing reviews:', e); }
+              } catch (e) { console.error('Error cleaning up reviews:', e); }
 
               return; 
             }
