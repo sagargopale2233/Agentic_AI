@@ -35,6 +35,19 @@ function scanFile(filePath) {
                 .join('');
             
             if (textContent.length > 0 && !el.hasAttribute('i18n')) {
+                // Check if any ancestor already has i18n (Angular handles nested content)
+                let parent = el.parentNode;
+                let hasI18nAncestor = false;
+                while (parent && parent.getAttribute) {
+                    if (parent.getAttribute('i18n') !== undefined) {
+                        hasI18nAncestor = true;
+                        break;
+                    }
+                    parent = parent.parentNode;
+                }
+                
+                if (hasI18nAncestor) return;
+
                 if (!/^\{\{.*\}\}$/.test(textContent)) {
                    const id = `@@${tag}${generateId(textContent)}`;
                    violations.push({
