@@ -117,20 +117,25 @@ jobs:
                   
                   const botReviewSignature = '### 🛑 i18n Verification Failed (Inline)';
                   // Filter for ANY review with the failure signature, regardless of state
-                  const previousReviews = reviews.filter(r => 
-                    r.body.includes(botReviewSignature)
-                  );
+                  // Sort by ID to ensure chronological order (Oldest first)
+                  previousReviews.sort((a, b) => a.id - b.id);
+                  const lastIndex = previousReviews.length - 1;
 
-                  for (const review of previousReviews) {
+                  for (let i = 0; i < previousReviews.length; i++) {
+                    const review = previousReviews[i];
                     try {
-                      // 1.3.1 ALWAYS Update the Review Title/Body to be positive
-                      // This ensures even old/dismissed reviews in the timeline don't show "Failed"
+                      // 1.3.1 Determine Title: Only the LATEST one gets the "Resolved" badge
+                      // Older ones revert to "Outdated" to minimize noise
+                      const startText = (i === lastIndex) 
+                        ? '### ✅ i18n Issues Resolved' 
+                        : '**(Outdated i18n Report)**';
+
                       await github.rest.pulls.updateReview({
                         owner: context.repo.owner,
                         repo: context.repo.repo,
                         pull_number: context.issue.number,
                         review_id: review.id,
-                        body: '### ✅ i18n Issues Resolved'
+                        body: startText
                       });
 
                       // 1.3.2 Dismiss it if not already dismissed
