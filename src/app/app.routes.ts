@@ -10,4 +10,5 @@ export const routes: Routes = [
   { path: 'create-employee', component: CreateEmployeeComponent },
   { path: 'employee-data', component: EmployeeDataComponent },
   { path: 'submit', component: SubmitComponent },
+  { path: '', redirectTo: '/login', pathMatch: 'full' }
 ];
